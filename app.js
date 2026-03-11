@@ -1,7 +1,6 @@
 /**
  * app.js — Extension Trimble Connect 3D
- * CDN officiel Trimble (IIFE) — TrimbleConnectWorkspace global
- * Écoute la sélection par polling sur api.viewer.getSelection()
+ * Utilise getObjects() pour récupérer le GUID IFC depuis le runtime id
  */
 
 const PSET_NAME = "PSET-MENSURA";
@@ -52,40 +51,91 @@ function extractMensuraProps(propertySets) {
   return null;
 }
 
-async function loadProperties(api, runtimeId) {
-  setStatus(`Chargement…`);
-
-  let objectId = runtimeId;
-
-  // Convertit le runtime id en object id IFC
+async function tryGetProperties(api, id) {
   try {
-    const converted = await api.viewer.convertToObjectIds([runtimeId]);
-    if (converted && converted.length > 0) {
-      objectId = converted[0];
-    }
+    const result = await api.viewer.getObjectProperties(id);
+    const sets = Array.isArray(result) ? result : (result ? [result] : []);
+    if (sets.length > 0) return sets;
   } catch (_) {}
+  return null;
+}
 
-  try {
-    const propertySets = await api.viewer.getObjectProperties(objectId);
-    const sets = Array.isArray(propertySets) ? propertySets : (propertySets ? [propertySets] : []);
+async function loadProperties(api, runtimeId) {
+  setStatus("Chargement…");
 
-    const mensuraProps = extractMensuraProps(sets);
+  // Stratégie 1 : runtime id directement
+  let sets = await tryGetProperties(api, runtimeId);
 
-    if (mensuraProps) {
-      setStatus("Objet sélectionné.", "ok");
-      contentEl.innerHTML = buildTable(mensuraProps);
-    } else {
-      // PSET non trouvé — affiche les noms disponibles pour diagnostic
-      const psetNames = sets.map(s => s.name ?? s.setName ?? "(sans nom)");
-      setStatus(`PSET "${PSET_NAME}" introuvable sur cet objet.`, "error");
-      contentEl.innerHTML = `
-        <p class="empty-pset">PSET disponibles sur cet objet :</p>
-        <ul style="font-size:11px;padding-left:16px;margin-top:4px;">
-          ${psetNames.map(n => `<li><code>${escapeHtml(n)}</code></li>`).join("")}
-        </ul>`;
+  // Stratégie 2 : convertToObjectIds → id IFC numérique
+  if (!sets || sets.length === 0) {
+    try {
+      const converted = await api.viewer.convertToObjectIds([runtimeId]);
+      if (converted && converted.length > 0 && converted[0]) {
+        sets = await tryGetProperties(api, converted[0]);
+      }
+    } catch (_) {}
+  }
+
+  // Stratégie 3 : getObjects → récupère le GUID IFC
+  if (!sets || sets.length === 0) {
+    try {
+      const objects = await api.viewer.getObjects({ runtimeIds: [runtimeId] });
+      console.log("[Mensura] getObjects :", JSON.stringify(objects));
+
+      if (objects && objects.length > 0) {
+        const obj = objects[0];
+        // Le GUID IFC peut être dans différents champs
+        const ifcGuid = obj.ifcGuid ?? obj.guid ?? obj.id ?? obj.objectId;
+        if (ifcGuid) {
+          sets = await tryGetProperties(api, ifcGuid);
+        }
+      }
+    } catch (err) {
+      console.warn("[Mensura] getObjects échoué :", err.message);
     }
-  } catch (err) {
-    setStatus("Erreur : " + err.message, "error");
+  }
+
+  // Stratégie 4 : getEntities
+  if (!sets || sets.length === 0) {
+    try {
+      const entities = await api.viewer.getEntities({ runtimeIds: [runtimeId] });
+      console.log("[Mensura] getEntities :", JSON.stringify(entities));
+
+      if (entities && entities.length > 0) {
+        const entity = entities[0];
+        const ifcGuid = entity.ifcGuid ?? entity.guid ?? entity.id ?? entity.objectId;
+        if (ifcGuid) {
+          sets = await tryGetProperties(api, ifcGuid);
+        }
+      }
+    } catch (err) {
+      console.warn("[Mensura] getEntities échoué :", err.message);
+    }
+  }
+
+  // Résultat
+  if (!sets || sets.length === 0) {
+    setStatus("Impossible de récupérer les propriétés.", "error");
+    contentEl.innerHTML = `<p class="empty-pset">
+      Aucune propriété trouvée pour cet objet.<br>
+      Essayez de sélectionner un objet du fichier REEFER.ifc qui contient PSET-MENSURA.
+    </p>`;
+    return;
+  }
+
+  const mensuraProps = extractMensuraProps(sets);
+
+  if (mensuraProps) {
+    setStatus("Objet sélectionné.", "ok");
+    contentEl.innerHTML = buildTable(mensuraProps);
+  } else {
+    const psetNames = sets.map(s => s.name ?? s.setName ?? "(sans nom)");
+    setStatus(`PSET "${PSET_NAME}" introuvable.`, "error");
+    contentEl.innerHTML = `
+      <p class="empty-pset">PSET disponibles :</p>
+      <ul style="font-size:11px;padding-left:16px;margin-top:4px;">
+        ${psetNames.map(n => `<li><code>${escapeHtml(n)}</code></li>`).join("")}
+      </ul>`;
   }
 }
 
