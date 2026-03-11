@@ -1,14 +1,6 @@
 {
-  "id": "pset-mensura",
-  "name": "PSET - Attributs Mensura",
-  "description": "Affiche les propriétés PSET - Attributs Mensura de l'objet sélectionné",
-  "version": "1.0.0",
-  "vendor": "RBInfra",
-  "extensions": [
-    {
-      "type": "panel",
-      "title": "Attributs Mensura",
-      "url": "index.html"
-    }
-  ]
+  "url": "https://rbinfra.github.io/trimble-extension/",
+  "title": "PSET - Attributs Mensura",
+  "icon": "https://rbinfra.github.io/trimble-extension/icon48.png",
+  "infoUrl": "https://rbinfra.github.io/trimble-extension/"
 }
