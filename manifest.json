@@ -1,7 +1,21 @@
 {
-  "title": "BIM Properties",
-  "icon": "https://cdn-icons-png.flaticon.com/512/1828/1828919.png",
-  "url": "https://RBINFRA.github.io/trimble-extension/index.html",
-  "description": "Custom BIM properties",
-  "enabled": true
+  "manifest_version": 3,
+  "name": "Trimble Connect - PSET Mensura",
+  "version": "1.0.0",
+  "description": "Extension pour afficher uniquement les propriétés PSET - Attributs Mensura d'un objet Trimble Connect",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://web.connect.trimble.com/*"
+  ],
+  "action": {
+    "default_popup": "index.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  }
 }
