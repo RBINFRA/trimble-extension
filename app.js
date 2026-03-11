@@ -1,56 +1,53 @@
-import * as WorkspaceAPI from "https://unpkg.com/trimble-connect-workspace-api";
-
 async function connectAPI() {
-  console.log("Connexion à Trimble Connect...");
+  console.log("Connexion à Trimble...");
 
-  // Connexion à l'API
-  const API = await WorkspaceAPI.connect(
-    window.parent,
-    async (event, args) => {
-      console.log("EVENT RECU:", event, args);
+  const API = await TrimbleConnectWorkspace.connect(window.parent, async (event, args) => {
+    console.log("EVENT:", event, args);
 
-      // Vérifie l'événement de sélection (selon version API)
-      if (event === "viewer.selection.changed" || event === "viewer.selectionchanged") {
-        const selection = args.data;
-        if (!selection || selection.length === 0) return;
+    // Vérifie l'événement de sélection
+    if (event === "viewer.selection.changed" || event === "viewer.selectionchanged") {
+      const selection = args.data;
+      if (!selection || selection.length === 0) {
+        document.getElementById("properties").innerHTML = "";
+        return;
+      }
 
-        const item = selection[0];
-        const modelId = item.modelId;
-        const objectIds = item.objectRuntimeIds;
+      const item = selection[0];
+      const modelId = item.modelId;
+      const objectIds = item.objectRuntimeIds;
 
-        try {
-          // Récupère les propriétés de l'objet sélectionné
-          const props = await API.viewer.getObjectProperties(modelId, objectIds);
-          afficherProprietesMensura(props);
-        } catch (err) {
-          console.error("Erreur récupération propriétés:", err);
-          document.getElementById("properties").innerHTML =
-            "Impossible de récupérer les propriétés de l'objet sélectionné.";
-        }
+      try {
+        // Récupère les propriétés de l'objet
+        const properties = await API.viewer.getObjectProperties(modelId, objectIds);
+        const mensura = properties?.properties?.["PSET - Attributs Mensura"];
+
+        afficherProprietes(mensura, properties?.name);
+      } catch (err) {
+        console.error("Erreur récupération propriétés:", err);
+        document.getElementById("properties").innerHTML = "Impossible de récupérer les propriétés.";
       }
     }
-  );
+  });
 
   console.log("API connectée :", API);
 }
 
-if (event === "viewer.selection.changed" || event === "viewer.selectionchanged") {
-  const selection = args.data;
-  console.log("SELECTION COMPLETE:", selection);
-}
-
-  let html = `<h3>${props.name || "Nom inconnu"}</h3>`;
-  html += "<ul>";
-
-  // Parcourt chaque clé du PSET
-  for (const [key, value] of Object.entries(mensura)) {
-    html += `<li><strong>${key}:</strong> ${value}</li>`;
+// Fonction pour afficher uniquement les propriétés du PSET Attributs Mensura
+function afficherProprietes(props, name) {
+  if (!props) {
+    document.getElementById("properties").innerHTML = "Aucune propriété Mensura disponible pour cet objet.";
+    return;
   }
 
-  html += "</ul>";
+  const html = Object.entries(props)
+    .map(([key, value]) => `<p><strong>${key}:</strong> ${value}</p>`)
+    .join("");
 
-  document.getElementById("properties").innerHTML = html;
+  document.getElementById("properties").innerHTML = `
+    <h3>${name || "Objet sélectionné"}</h3>
+    ${html}
+  `;
 }
 
-// Lancement de la connexion
+// Lancer la connexion
 connectAPI();
