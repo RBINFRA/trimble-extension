@@ -1,21 +1,16 @@
 {
-  "manifest_version": 3,
-  "name": "Trimble Connect - PSET Mensura",
+  "id": "pset-mensura",
+  "name": "PSET - Attributs Mensura",
+  "description": "Affiche les propriétés PSET - Attributs Mensura de l'objet sélectionné",
   "version": "1.0.0",
-  "description": "Extension pour afficher uniquement les propriétés PSET - Attributs Mensura d'un objet Trimble Connect",
-  "permissions": [
-    "activeTab",
-    "scripting"
-  ],
-  "host_permissions": [
-    "https://web.connect.trimble.com/*"
-  ],
-  "action": {
-    "default_popup": "index.html",
-    "default_icon": {
-      "16": "icon16.png",
-      "48": "icon48.png",
-      "128": "icon128.png"
+  "vendor": "RBInfra",
+  "icon": "icon48.png",
+  "extensions": [
+    {
+      "type": "panel",
+      "title": "Attributs Mensura",
+      "url": "index.html",
+      "icon": "icon48.png"
     }
-  }
+  ]
 }
