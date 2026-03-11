@@ -2,24 +2,18 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Extension BIM - Propriétés Mensura</title>
+  <title>Trimble Connect PSET Mensura</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 10px; }
-    #properties { margin-top: 10px; }
-    h3 { margin-bottom: 5px; }
-    p { margin: 2px 0; }
+    h3 { margin-top: 0; }
+    ul { padding-left: 20px; }
   </style>
 </head>
 <body>
+  <div id="properties">
+    <!-- Les propriétés s'afficheront ici -->
+  </div>
 
-<h2>Propriétés BIM - PSET "Attributs Mensura"</h2>
-<div id="properties"></div>
-
-<!-- API Trimble Connect Workspace -->
-<script src="https://unpkg.com/trimble-connect-workspace-api/dist/trimble-connect-workspace-api.iife.js"></script>
-
-<!-- Code de l’extension -->
-<script src="app.js"></script>
-
+  <script type="module" src="app.js"></script>
 </body>
 </html>
