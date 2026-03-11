@@ -4,13 +4,16 @@
   "description": "Affiche les propriétés PSET - Attributs Mensura de l'objet sélectionné",
   "version": "1.0.0",
   "vendor": "RBInfra",
-  "icon": "icon48.png",
   "extensions": [
     {
       "type": "panel",
       "title": "Attributs Mensura",
-      "url": "index.html",
-      "icon": "icon48.png"
+      "url": "index.html"
     }
   ]
 }
+```
+
+Puisque vous avez maintenant ajouté `icon48.png` dans le repo, vous pouvez aussi **garder les références à l'icône** — les deux versions fonctionneront. Ce qui compte c'est que le fichier `icon48.png` soit bien accessible à cette URL :
+```
+https://rbinfra.github.io/trimble-extension/icon48.png
