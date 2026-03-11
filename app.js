@@ -1,9 +1,11 @@
 /**
  * app.js — Extension Trimble Connect 3D
  * CDN officiel Trimble (IIFE) — TrimbleConnectWorkspace global
+ * Écoute la sélection par polling sur api.viewer.getSelection()
  */
 
 const PSET_NAME = "PSET - Attributs Mensura";
+const POLL_INTERVAL_MS = 800; // intervalle de vérification de la sélection
 
 const statusEl  = document.getElementById("status");
 const contentEl = document.getElementById("content");
@@ -54,51 +56,30 @@ function extractMensuraProps(propertySets) {
   return null;
 }
 
-async function fetchProperties(api, objectId) {
-  const methods = [
-    () => api.viewer.getObjectProperties(objectId),
-    () => api.viewer.getProperties(objectId),
-    () => api.model?.getObjectProperties?.(objectId),
-  ];
-  for (const fn of methods) {
-    try {
-      const result = await fn();
-      if (result) return result;
-    } catch (_) {}
-  }
-  return null;
-}
-
-async function onSelectionChange(api, rawSelection) {
-  const ids = Array.isArray(rawSelection)
-    ? rawSelection
-    : (rawSelection?.ids ?? rawSelection?.objectIds ?? []);
-
-  if (ids.length === 0) {
-    showMessage("Sélectionnez un objet dans la maquette.");
-    setStatus("En attente de sélection.");
-    return;
-  }
-
-  const objectId = ids[0];
+async function handleObjectSelected(api, objectId) {
   setStatus(`Chargement… (id: ${objectId})`);
-
   try {
-    const propertySets = await fetchProperties(api, objectId);
+    // getObjectProperties est confirmé disponible dans api.viewer
+    const propertySets = await api.viewer.getObjectProperties(objectId);
+
     if (!propertySets) {
       setStatus("Aucune propriété retournée par l'API.", "error");
       showMessage("L'API n'a retourné aucune propriété pour cet objet.");
       return;
     }
+
     const mensuraProps = extractMensuraProps(propertySets);
+
     if (mensuraProps === null) {
       setStatus("PSET introuvable sur cet objet.", "error");
       contentEl.innerHTML =
         `<p class="empty-pset">Le PSET « ${escapeHtml(PSET_NAME)} » n'existe pas sur cet objet.</p>`;
       return;
     }
-    setStatus(`${ids.length} objet${ids.length > 1 ? "s" : ""} sélectionné${ids.length > 1 ? "s" : ""}.`, "ok");
+
+    setStatus("Objet sélectionné.", "ok");
     contentEl.innerHTML = buildTable(mensuraProps);
+
   } catch (err) {
     console.error("[Mensura] Erreur propriétés :", err);
     setStatus("Erreur lors de la récupération des propriétés.", "error");
@@ -106,57 +87,37 @@ async function onSelectionChange(api, rawSelection) {
   }
 }
 
-// ── Diagnostic : affiche toutes les méthodes disponibles sur l'API ─────────────
-function logApiStructure(api) {
-  console.log("[Mensura] === STRUCTURE DE L'API ===");
-  console.log("[Mensura] api keys:", Object.keys(api));
+function startSelectionPolling(api) {
+  let lastObjectId = null;
 
-  if (api.viewer) {
-    console.log("[Mensura] api.viewer keys:", Object.keys(api.viewer));
-    // Liste toutes les méthodes de api.viewer
-    const viewerMethods = Object.getOwnPropertyNames(
-      Object.getPrototypeOf(api.viewer) || api.viewer
-    ).filter(k => typeof api.viewer[k] === "function");
-    console.log("[Mensura] api.viewer methods:", viewerMethods);
-  } else {
-    console.warn("[Mensura] api.viewer est undefined !");
-  }
+  setInterval(async () => {
+    try {
+      // getSelection retourne un tableau d'ids ou un objet selon la version
+      const selection = await api.viewer.getSelection();
 
-  if (api.extension) {
-    console.log("[Mensura] api.extension keys:", Object.keys(api.extension));
-  }
-}
+      // Normalise en tableau d'ids
+      const ids = Array.isArray(selection)
+        ? selection
+        : (selection?.ids ?? selection?.objectIds ?? []);
 
-function listenToSelection(api) {
-  // Diagnostic complet avant de tenter l'écoute
-  logApiStructure(api);
+      const currentId = ids.length > 0 ? String(ids[0]) : null;
 
-  // Tentatives dans l'ordre
-  if (typeof api.viewer?.onSelectionChanged === "function") {
-    console.log("[Mensura] Utilise api.viewer.onSelectionChanged");
-    api.viewer.onSelectionChanged((data) => onSelectionChange(api, data));
-    return;
-  }
-  if (typeof api.viewer?.addEventListener === "function") {
-    console.log("[Mensura] Utilise api.viewer.addEventListener selectionChanged");
-    api.viewer.addEventListener("selectionChanged", (data) => onSelectionChange(api, data));
-    return;
-  }
-  if (typeof api.viewer?.on === "function") {
-    console.log("[Mensura] Utilise api.viewer.on selectionChanged");
-    api.viewer.on("selectionChanged", (data) => onSelectionChange(api, data));
-    return;
-  }
+      // Ne traite que si la sélection a changé
+      if (currentId === lastObjectId) return;
+      lastObjectId = currentId;
 
-  // Affiche dans le panneau les méthodes disponibles pour aider au diagnostic
-  const viewerKeys = api.viewer ? Object.keys(api.viewer).join(", ") : "api.viewer indisponible";
-  console.warn("[Mensura] Aucune méthode d'écoute trouvée. Clés viewer :", viewerKeys);
-  setStatus("Impossible d'écouter la sélection.", "error");
-  contentEl.innerHTML = `
-    <p style="color:#c0392b;font-size:11px;padding:10px;">
-      Méthodes viewer disponibles :<br>
-      <code style="font-size:10px;word-break:break-all;">${escapeHtml(viewerKeys)}</code>
-    </p>`;
+      if (!currentId) {
+        showMessage("Sélectionnez un objet dans la maquette.");
+        setStatus("En attente de sélection.");
+        return;
+      }
+
+      await handleObjectSelected(api, currentId);
+
+    } catch (err) {
+      // Erreur silencieuse pendant le polling — ne pas spammer la console
+    }
+  }, POLL_INTERVAL_MS);
 }
 
 async function main() {
@@ -177,7 +138,9 @@ async function main() {
 
     setStatus("Connecté. En attente de sélection.", "ok");
     showMessage("Sélectionnez un objet dans la maquette.");
-    listenToSelection(api);
+
+    // Démarre le polling sur getSelection()
+    startSelectionPolling(api);
 
   } catch (err) {
     console.error("[Mensura] Connexion échouée :", err);
