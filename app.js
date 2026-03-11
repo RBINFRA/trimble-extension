@@ -1,53 +1,40 @@
+import * as WorkspaceAPI from "https://unpkg.com/trimble-connect-workspace-api@0.3.34/dist/trimble-connect-workspace-api.esm.js";
+
 async function connectAPI() {
   console.log("Connexion à Trimble...");
 
-  const API = await TrimbleConnectWorkspace.connect(window.parent, async (event, args) => {
+  const API = await WorkspaceAPI.connect(window.parent, async (event, args) => {
     console.log("EVENT:", event, args);
 
-    // Vérifie l'événement de sélection
-    if (event === "viewer.selection.changed" || event === "viewer.selectionchanged") {
+    if (event === "viewer.selection.changed") {
       const selection = args.data;
-      if (!selection || selection.length === 0) {
-        document.getElementById("properties").innerHTML = "";
-        return;
-      }
+      if (!selection || selection.length === 0) return;
 
       const item = selection[0];
       const modelId = item.modelId;
       const objectIds = item.objectRuntimeIds;
 
-      try {
-        // Récupère les propriétés de l'objet
-        const properties = await API.viewer.getObjectProperties(modelId, objectIds);
-        const mensura = properties?.properties?.["PSET - Attributs Mensura"];
-
-        afficherProprietes(mensura, properties?.name);
-      } catch (err) {
-        console.error("Erreur récupération propriétés:", err);
-        document.getElementById("properties").innerHTML = "Impossible de récupérer les propriétés.";
-      }
+      const properties = await API.viewer.getObjectProperties(modelId, objectIds);
+      afficherProprietesMensura(properties);
     }
   });
 
   console.log("API connectée :", API);
 }
 
-// Fonction pour afficher uniquement les propriétés du PSET Attributs Mensura
-function afficherProprietes(props, name) {
-  if (!props) {
-    document.getElementById("properties").innerHTML = "Aucune propriété Mensura disponible pour cet objet.";
-    return;
+function afficherProprietesMensura(props) {
+  if (!props || !props.properties) return;
+
+  const pset = props.properties["PSET - Attributs Mensura"];
+  if (!pset) return;
+
+  let html = "<h3>Propriétés Mensura</h3><ul>";
+  for (const key in pset) {
+    html += `<li><strong>${key}</strong> : ${pset[key]}</li>`;
   }
+  html += "</ul>";
 
-  const html = Object.entries(props)
-    .map(([key, value]) => `<p><strong>${key}:</strong> ${value}</p>`)
-    .join("");
-
-  document.getElementById("properties").innerHTML = `
-    <h3>${name || "Objet sélectionné"}</h3>
-    ${html}
-  `;
+  document.getElementById("properties").innerHTML = html;
 }
 
-// Lancer la connexion
 connectAPI();
