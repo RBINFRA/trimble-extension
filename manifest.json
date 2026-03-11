@@ -1,0 +1,7 @@
+{
+  "title": "BIM Properties",
+  "icon": "https://cdn-icons-png.flaticon.com/512/1828/1828919.png",
+  "url": "https://RBINFRA.github.io/trimble-extension/index.html",
+  "description": "Custom BIM properties",
+  "enabled": true
+}
