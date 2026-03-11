@@ -5,7 +5,7 @@
  */
 
 const PSET_NAME = "PSET - Attributs Mensura";
-const POLL_INTERVAL_MS = 800; // intervalle de vérification de la sélection
+const POLL_INTERVAL_MS = 800;
 
 const statusEl  = document.getElementById("status");
 const contentEl = document.getElementById("content");
@@ -59,8 +59,22 @@ function extractMensuraProps(propertySets) {
 async function handleObjectSelected(api, objectId) {
   setStatus(`Chargement… (id: ${objectId})`);
   try {
-    // getObjectProperties est confirmé disponible dans api.viewer
     const propertySets = await api.viewer.getObjectProperties(objectId);
+
+    // ── DIAGNOSTIC : affiche la structure brute dans la console ──────────────
+    console.log("[Mensura] getObjectProperties brut :", JSON.stringify(propertySets, null, 2));
+
+    // Affiche aussi tous les noms de PSET disponibles dans le panneau
+    const sets = Array.isArray(propertySets) ? propertySets : [propertySets];
+    const psetNames = sets.map(s => s.name ?? s.setName ?? "(sans nom)");
+    console.log("[Mensura] Noms de PSET disponibles :", psetNames);
+
+    // Affiche les noms dans le panneau pour diagnostic visuel
+    contentEl.innerHTML = `
+      <div style="font-size:11px;padding:8px;background:#fff3cd;border:1px solid #ffc107;border-radius:4px;margin-bottom:8px;">
+        <strong>PSET disponibles sur cet objet :</strong><br>
+        ${psetNames.map(n => `• ${escapeHtml(n)}`).join("<br>")}
+      </div>`;
 
     if (!propertySets) {
       setStatus("Aucune propriété retournée par l'API.", "error");
@@ -71,9 +85,7 @@ async function handleObjectSelected(api, objectId) {
     const mensuraProps = extractMensuraProps(propertySets);
 
     if (mensuraProps === null) {
-      setStatus("PSET introuvable sur cet objet.", "error");
-      contentEl.innerHTML =
-        `<p class="empty-pset">Le PSET « ${escapeHtml(PSET_NAME)} » n'existe pas sur cet objet.</p>`;
+      setStatus("PSET introuvable — voir liste ci-dessous.", "error");
       return;
     }
 
@@ -92,63 +104,39 @@ function startSelectionPolling(api) {
 
   setInterval(async () => {
     try {
-      // getSelection retourne un tableau d'ids ou un objet selon la version
       const selection = await api.viewer.getSelection();
-
-      // Normalise en tableau d'ids
       const ids = Array.isArray(selection)
         ? selection
         : (selection?.ids ?? selection?.objectIds ?? []);
-
       const currentId = ids.length > 0 ? String(ids[0]) : null;
-
-      // Ne traite que si la sélection a changé
       if (currentId === lastObjectId) return;
       lastObjectId = currentId;
-
       if (!currentId) {
         showMessage("Sélectionnez un objet dans la maquette.");
         setStatus("En attente de sélection.");
         return;
       }
-
       await handleObjectSelected(api, currentId);
-
-    } catch (err) {
-      // Erreur silencieuse pendant le polling — ne pas spammer la console
-    }
+    } catch (_) {}
   }, POLL_INTERVAL_MS);
 }
 
 async function main() {
   setStatus("Connexion à Trimble Connect…");
-
   if (typeof TrimbleConnectWorkspace === "undefined") {
     setStatus("Erreur : librairie Trimble non chargée.", "error");
     showMessage("La librairie TrimbleConnectWorkspace n'est pas disponible.");
     return;
   }
-
   try {
-    const api = await TrimbleConnectWorkspace.connect(
-      window.parent,
-      null,
-      30000
-    );
-
+    const api = await TrimbleConnectWorkspace.connect(window.parent, null, 30000);
     setStatus("Connecté. En attente de sélection.", "ok");
     showMessage("Sélectionnez un objet dans la maquette.");
-
-    // Démarre le polling sur getSelection()
     startSelectionPolling(api);
-
   } catch (err) {
     console.error("[Mensura] Connexion échouée :", err);
     setStatus("Connexion à Trimble Connect échouée.", "error");
-    showMessage(
-      "Impossible de se connecter à l'API Trimble Connect.<br>" +
-      "Vérifiez que l'extension est chargée depuis Trimble Connect."
-    );
+    showMessage("Impossible de se connecter à l'API Trimble Connect.");
   }
 }
 
