@@ -34,16 +34,10 @@ async function connectAPI() {
   console.log("API connectée :", API);
 }
 
-// Affiche uniquement les propriétés contenues dans "PSET - Attributs Mensura"
-function afficherProprietesMensura(props) {
-  if (!props) return;
-
-  const mensura = props.properties?.["PSET - Attributs Mensura"];
-  if (!mensura) {
-    document.getElementById("properties").innerHTML =
-      `<p>Aucune propriété 'PSET - Attributs Mensura' trouvée pour cet objet.</p>`;
-    return;
-  }
+if (event === "viewer.selection.changed" || event === "viewer.selectionchanged") {
+  const selection = args.data;
+  console.log("SELECTION COMPLETE:", selection);
+}
 
   let html = `<h3>${props.name || "Nom inconnu"}</h3>`;
   html += "<ul>";
