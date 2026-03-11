@@ -1,21 +1,14 @@
 /**
  * app.js — Extension Trimble Connect 3D
- * Affiche uniquement les propriétés "PSET - Attributs Mensura"
- * de l'objet sélectionné dans la maquette.
- *
- * Format conforme à la documentation officielle Trimble Connect Workspace API.
+ * Utilise le CDN officiel Trimble (IIFE) : TrimbleConnectWorkspace global
+ * Affiche les propriétés "PSET - Attributs Mensura" de l'objet sélectionné.
  */
 
-import { connect } from "https://unpkg.com/trimble-connect-workspace-api@0.3.34/dist/trimble-connect-workspace-api.esm.js";
-
-// ── Constante ─────────────────────────────────────────────────────────────────
 const PSET_NAME = "PSET - Attributs Mensura";
 
-// ── DOM ───────────────────────────────────────────────────────────────────────
 const statusEl  = document.getElementById("status");
 const contentEl = document.getElementById("content");
 
-// ── UI ────────────────────────────────────────────────────────────────────────
 function setStatus(msg, type = "") {
   statusEl.textContent = msg;
   statusEl.className   = type;
@@ -41,12 +34,10 @@ function buildTable(props) {
   const rows = entries
     .map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`)
     .join("");
-  return `
-    <div class="pset-title">${escapeHtml(PSET_NAME)}</div>
+  return `<div class="pset-title">${escapeHtml(PSET_NAME)}</div>
     <table><tbody>${rows}</tbody></table>`;
 }
 
-// ── Extraction du PSET ────────────────────────────────────────────────────────
 function extractMensuraProps(propertySets) {
   const sets = Array.isArray(propertySets) ? propertySets : [propertySets];
   for (const pset of sets) {
@@ -64,7 +55,6 @@ function extractMensuraProps(propertySets) {
   return null;
 }
 
-// ── Récupération des propriétés ───────────────────────────────────────────────
 async function fetchProperties(api, objectId) {
   const methods = [
     () => api.viewer.getObjectProperties(objectId),
@@ -75,12 +65,11 @@ async function fetchProperties(api, objectId) {
     try {
       const result = await fn();
       if (result) return result;
-    } catch (_) { /* méthode indisponible */ }
+    } catch (_) {}
   }
   return null;
 }
 
-// ── Callback sélection ────────────────────────────────────────────────────────
 async function onSelectionChange(api, rawSelection) {
   const ids = Array.isArray(rawSelection)
     ? rawSelection
@@ -97,25 +86,20 @@ async function onSelectionChange(api, rawSelection) {
 
   try {
     const propertySets = await fetchProperties(api, objectId);
-
     if (!propertySets) {
       setStatus("Aucune propriété retournée par l'API.", "error");
       showMessage("L'API n'a retourné aucune propriété pour cet objet.");
       return;
     }
-
     const mensuraProps = extractMensuraProps(propertySets);
-
     if (mensuraProps === null) {
       setStatus("PSET introuvable sur cet objet.", "error");
       contentEl.innerHTML =
         `<p class="empty-pset">Le PSET « ${escapeHtml(PSET_NAME)} » n'existe pas sur cet objet.</p>`;
       return;
     }
-
     setStatus(`${ids.length} objet${ids.length > 1 ? "s" : ""} sélectionné${ids.length > 1 ? "s" : ""}.`, "ok");
     contentEl.innerHTML = buildTable(mensuraProps);
-
   } catch (err) {
     console.error("[Mensura] Erreur propriétés :", err);
     setStatus("Erreur lors de la récupération des propriétés.", "error");
@@ -123,7 +107,6 @@ async function onSelectionChange(api, rawSelection) {
   }
 }
 
-// ── Abonnement aux événements de sélection ────────────────────────────────────
 function listenToSelection(api) {
   if (typeof api.viewer?.onSelectionChanged === "function") {
     api.viewer.onSelectionChanged((data) => onSelectionChange(api, data));
@@ -137,12 +120,18 @@ function listenToSelection(api) {
   setStatus("Impossible d'écouter la sélection.", "error");
 }
 
-// ── Point d'entrée — conforme à la doc officielle ─────────────────────────────
 async function main() {
   setStatus("Connexion à Trimble Connect…");
+
+  // Attend que TrimbleConnectWorkspace soit disponible (chargé par le script IIFE)
+  if (typeof TrimbleConnectWorkspace === "undefined") {
+    setStatus("Erreur : librairie Trimble non chargée.", "error");
+    showMessage("La librairie TrimbleConnectWorkspace n'est pas disponible.");
+    return;
+  }
+
   try {
-    // Signature officielle : connect(parent, eventHandler, timeout)
-    const api = await connect(
+    const api = await TrimbleConnectWorkspace.connect(
       window.parent,
       (event, data) => {
         console.log("[Mensura] event:", event, data);
