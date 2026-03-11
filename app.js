@@ -1,6 +1,6 @@
 /**
  * app.js — Extension Trimble Connect 3D
- * Utilise le CDN officiel Trimble (IIFE) : TrimbleConnectWorkspace global
+ * CDN officiel Trimble (IIFE) — TrimbleConnectWorkspace global
  * Affiche les propriétés "PSET - Attributs Mensura" de l'objet sélectionné.
  */
 
@@ -123,7 +123,6 @@ function listenToSelection(api) {
 async function main() {
   setStatus("Connexion à Trimble Connect…");
 
-  // Attend que TrimbleConnectWorkspace soit disponible (chargé par le script IIFE)
   if (typeof TrimbleConnectWorkspace === "undefined") {
     setStatus("Erreur : librairie Trimble non chargée.", "error");
     showMessage("La librairie TrimbleConnectWorkspace n'est pas disponible.");
@@ -131,11 +130,10 @@ async function main() {
   }
 
   try {
+    // IMPORTANT : pas de callback en 2e argument — déclenche getPermission/notImplemented
     const api = await TrimbleConnectWorkspace.connect(
       window.parent,
-      (event, data) => {
-        console.log("[Mensura] event:", event, data);
-      },
+      null,
       30000
     );
 
