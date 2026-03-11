@@ -1,10 +1,11 @@
 /**
- * app.js — Extension Trimble Connect
+ * app.js — Extension Trimble Connect 3D
  * Affiche uniquement les propriétés "PSET - Attributs Mensura"
  * de l'objet sélectionné dans la maquette.
+ *
+ * Format conforme à la documentation officielle Trimble Connect Workspace API.
  */
 
-// Import nommé ESM — évite le redeclaration et le MIME type incorrect du .iife.js
 import { connect } from "https://unpkg.com/trimble-connect-workspace-api@0.3.34/dist/trimble-connect-workspace-api.esm.js";
 
 // ── Constante ─────────────────────────────────────────────────────────────────
@@ -17,7 +18,7 @@ const contentEl = document.getElementById("content");
 // ── UI ────────────────────────────────────────────────────────────────────────
 function setStatus(msg, type = "") {
   statusEl.textContent = msg;
-  statusEl.className   = type; // "" | "error" | "ok"
+  statusEl.className   = type;
 }
 
 function showMessage(msg) {
@@ -51,13 +52,11 @@ function extractMensuraProps(propertySets) {
   for (const pset of sets) {
     const name = pset.name ?? pset.setName ?? "";
     if (name !== PSET_NAME) continue;
-    // Format A : properties = [{ name, value }, …]
     if (Array.isArray(pset.properties)) {
       const result = {};
       for (const p of pset.properties) { result[p.name] = p.value; }
       return result;
     }
-    // Format B : properties = { clé: valeur }
     if (pset.properties && typeof pset.properties === "object") {
       return { ...pset.properties };
     }
@@ -65,7 +64,7 @@ function extractMensuraProps(propertySets) {
   return null;
 }
 
-// ── Récupération des propriétés (fallback sur plusieurs méthodes API) ──────────
+// ── Récupération des propriétés ───────────────────────────────────────────────
 async function fetchProperties(api, objectId) {
   const methods = [
     () => api.viewer.getObjectProperties(objectId),
@@ -76,7 +75,7 @@ async function fetchProperties(api, objectId) {
     try {
       const result = await fn();
       if (result) return result;
-    } catch (_) { /* méthode indisponible, on continue */ }
+    } catch (_) { /* méthode indisponible */ }
   }
   return null;
 }
@@ -134,21 +133,22 @@ function listenToSelection(api) {
     api.viewer.addEventListener("selectionChanged", (data) => onSelectionChange(api, data));
     return;
   }
-  if (typeof api.addEventListener === "function") {
-    api.addEventListener("viewer.selectionChanged", (data) => onSelectionChange(api, data));
-    return;
-  }
-  console.warn("[Mensura] Aucune méthode d'écoute de sélection trouvée sur l'API.");
+  console.warn("[Mensura] Aucune méthode d'écoute de sélection trouvée.");
   setStatus("Impossible d'écouter la sélection.", "error");
 }
 
-// ── Point d'entrée ────────────────────────────────────────────────────────────
+// ── Point d'entrée — conforme à la doc officielle ─────────────────────────────
 async function main() {
   setStatus("Connexion à Trimble Connect…");
   try {
-    // IMPORTANT : on passe undefined en 2e argument pour éviter
-    // l'erreur "getPermission / notImplemented" de Trimble Connect
-    const api = await connect(window.parent, undefined, 30_000);
+    // Signature officielle : connect(parent, eventHandler, timeout)
+    const api = await connect(
+      window.parent,
+      (event, data) => {
+        console.log("[Mensura] event:", event, data);
+      },
+      30000
+    );
 
     setStatus("Connecté. En attente de sélection.", "ok");
     showMessage("Sélectionnez un objet dans la maquette.");
