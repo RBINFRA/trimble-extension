@@ -1,7 +1,5 @@
 /**
- * app.js — Extension Trimble Connect 3D
- * CDN officiel Trimble (IIFE) — TrimbleConnectWorkspace global
- * Écoute la sélection par polling sur api.viewer.getSelection()
+ * app.js — Extension Trimble Connect 3D — MODE DIAGNOSTIC
  */
 
 const PSET_NAME = "PSET - Attributs Mensura";
@@ -15,10 +13,6 @@ function setStatus(msg, type = "") {
   statusEl.className   = type;
 }
 
-function showMessage(msg) {
-  contentEl.innerHTML = `<p class="no-selection">${msg}</p>`;
-}
-
 function escapeHtml(str) {
   return String(str ?? "")
     .replace(/&/g, "&amp;")
@@ -30,7 +24,7 @@ function escapeHtml(str) {
 function buildTable(props) {
   const entries = Object.entries(props);
   if (entries.length === 0) {
-    return `<p class="empty-pset">Aucune propriété dans « ${escapeHtml(PSET_NAME)} ».</p>`;
+    return `<p style="color:#999;font-style:italic">Aucune propriété dans « ${escapeHtml(PSET_NAME)} ».</p>`;
   }
   const rows = entries
     .map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`)
@@ -56,52 +50,94 @@ function extractMensuraProps(propertySets) {
   return null;
 }
 
-async function handleObjectSelected(api, objectId) {
-  setStatus(`Chargement… (id: ${objectId})`);
+// Affiche le résultat brut dans le panneau
+function showRaw(data) {
   try {
-    const propertySets = await api.viewer.getObjectProperties(objectId);
-
-    // ── DIAGNOSTIC : affiche la structure brute dans la console ──────────────
-    console.log("[Mensura] getObjectProperties brut :", JSON.stringify(propertySets, null, 2));
-
-    // Affiche aussi tous les noms de PSET disponibles dans le panneau
-    const sets = Array.isArray(propertySets) ? propertySets : [propertySets];
+    const sets = Array.isArray(data) ? data : [data];
     const psetNames = sets.map(s => s.name ?? s.setName ?? "(sans nom)");
-    console.log("[Mensura] Noms de PSET disponibles :", psetNames);
 
-    // Affiche les noms dans le panneau pour diagnostic visuel
     contentEl.innerHTML = `
       <div style="font-size:11px;padding:8px;background:#fff3cd;border:1px solid #ffc107;border-radius:4px;margin-bottom:8px;">
-        <strong>PSET disponibles sur cet objet :</strong><br>
-        ${psetNames.map(n => `• ${escapeHtml(n)}`).join("<br>")}
+        <strong>PSET disponibles (${sets.length}) :</strong><br>
+        ${psetNames.map(n => `• <code>${escapeHtml(n)}</code>`).join("<br>")}
       </div>`;
 
-    if (!propertySets) {
-      setStatus("Aucune propriété retournée par l'API.", "error");
-      showMessage("L'API n'a retourné aucune propriété pour cet objet.");
-      return;
+    // Cherche Mensura
+    const props = extractMensuraProps(data);
+    if (props) {
+      setStatus("PSET Mensura trouvé !", "ok");
+      contentEl.innerHTML += buildTable(props);
+    } else {
+      setStatus(`PSET "${PSET_NAME}" introuvable.`, "error");
     }
-
-    const mensuraProps = extractMensuraProps(propertySets);
-
-    if (mensuraProps === null) {
-      setStatus("PSET introuvable — voir liste ci-dessous.", "error");
-      return;
-    }
-
-    setStatus("Objet sélectionné.", "ok");
-    contentEl.innerHTML = buildTable(mensuraProps);
-
-  } catch (err) {
-    console.error("[Mensura] Erreur propriétés :", err);
-    setStatus("Erreur lors de la récupération des propriétés.", "error");
-    showMessage(`Erreur : ${escapeHtml(err.message)}`);
+  } catch(e) {
+    contentEl.innerHTML = `<pre style="font-size:10px;overflow:auto">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
   }
 }
 
-function startSelectionPolling(api) {
-  let lastObjectId = null;
+async function main() {
+  setStatus("Connexion à Trimble Connect…");
 
+  if (typeof TrimbleConnectWorkspace === "undefined") {
+    setStatus("Erreur : librairie Trimble non chargée.", "error");
+    return;
+  }
+
+  let api;
+  try {
+    api = await TrimbleConnectWorkspace.connect(window.parent, null, 30000);
+    setStatus("Connecté ✓ — sélectionnez un objet puis cliquez le bouton.", "ok");
+  } catch (err) {
+    setStatus("Connexion échouée : " + err.message, "error");
+    return;
+  }
+
+  // Bouton de test manuel
+  contentEl.innerHTML = `
+    <button id="btnTest" style="
+      display:block;width:100%;padding:10px;margin-bottom:10px;
+      background:#0072c6;color:white;border:none;border-radius:4px;
+      font-size:13px;cursor:pointer;">
+      📋 Lire la sélection actuelle
+    </button>
+    <div id="result"><p style="color:#999;font-style:italic;text-align:center;margin-top:20px;">
+      Sélectionnez un objet dans la maquette puis cliquez le bouton.
+    </p></div>`;
+
+  document.getElementById("btnTest").addEventListener("click", async () => {
+    const resultEl = document.getElementById("result");
+    setStatus("Lecture en cours…");
+
+    try {
+      // Test getSelection
+      const selection = await api.viewer.getSelection();
+      const ids = Array.isArray(selection)
+        ? selection
+        : (selection?.ids ?? selection?.objectIds ?? []);
+
+      resultEl.innerHTML = `<p style="font-size:11px;margin-bottom:8px;">
+        <strong>getSelection() :</strong> ${escapeHtml(JSON.stringify(ids))}
+      </p>`;
+
+      if (ids.length === 0) {
+        setStatus("Aucun objet sélectionné.", "error");
+        return;
+      }
+
+      const objectId = String(ids[0]);
+      setStatus(`Objet : ${objectId} — chargement propriétés…`);
+
+      const propertySets = await api.viewer.getObjectProperties(objectId);
+      showRaw(propertySets);
+
+    } catch (err) {
+      setStatus("Erreur : " + err.message, "error");
+      resultEl.innerHTML = `<pre style="font-size:10px;color:red;">${escapeHtml(err.stack)}</pre>`;
+    }
+  });
+
+  // Polling en parallèle
+  let lastId = null;
   setInterval(async () => {
     try {
       const selection = await api.viewer.getSelection();
@@ -109,35 +145,17 @@ function startSelectionPolling(api) {
         ? selection
         : (selection?.ids ?? selection?.objectIds ?? []);
       const currentId = ids.length > 0 ? String(ids[0]) : null;
-      if (currentId === lastObjectId) return;
-      lastObjectId = currentId;
+      if (currentId === lastId) return;
+      lastId = currentId;
       if (!currentId) {
-        showMessage("Sélectionnez un objet dans la maquette.");
-        setStatus("En attente de sélection.");
+        setStatus("Connecté ✓ — En attente de sélection.", "ok");
         return;
       }
-      await handleObjectSelected(api, currentId);
+      setStatus(`Objet détecté : ${currentId}`, "ok");
+      const propertySets = await api.viewer.getObjectProperties(currentId);
+      showRaw(propertySets);
     } catch (_) {}
   }, POLL_INTERVAL_MS);
-}
-
-async function main() {
-  setStatus("Connexion à Trimble Connect…");
-  if (typeof TrimbleConnectWorkspace === "undefined") {
-    setStatus("Erreur : librairie Trimble non chargée.", "error");
-    showMessage("La librairie TrimbleConnectWorkspace n'est pas disponible.");
-    return;
-  }
-  try {
-    const api = await TrimbleConnectWorkspace.connect(window.parent, null, 30000);
-    setStatus("Connecté. En attente de sélection.", "ok");
-    showMessage("Sélectionnez un objet dans la maquette.");
-    startSelectionPolling(api);
-  } catch (err) {
-    console.error("[Mensura] Connexion échouée :", err);
-    setStatus("Connexion à Trimble Connect échouée.", "error");
-    showMessage("Impossible de se connecter à l'API Trimble Connect.");
-  }
 }
 
 main();
