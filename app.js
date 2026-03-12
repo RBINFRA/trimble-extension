@@ -4,6 +4,10 @@
  */
 
 const PSET_NAME = "PSET - Attributs Mensura";
+const SECONDARY_PSET_NAME = "PSET-MENSURA";
+const SECONDARY_PROPERTY_NAME = "Code de PTF";
+const GENERAL_INFO_TITLE = "Information générale";
+const MATERIALS_TITLE = "Matériaux";
 const POLL_INTERVAL_MS = 800;
 const REPO_OWNER = "RBINFRA";
 const REPO_NAME = "trimble-extension";
@@ -73,18 +77,17 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
-function buildTable(props) {
-  const entries = Object.entries(props);
-  if (entries.length === 0) {
-    return `<p class="empty-pset">Aucune propriété dans « ${escapeHtml(PSET_NAME)} ».</p>`;
-  }
-  const [, firstValue] = entries[0];
-  const title = String(firstValue ?? "").trim() || PSET_NAME;
-  const rows = entries
-    .map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`)
-    .join("");
-  return `<div class="pset-title">${escapeHtml(title)}</div>
-    <table><tbody>${rows}</tbody></table>`;
+function buildSection(title, rows, emptyMessage = "") {
+  const body = rows.length > 0
+    ? `<table><tbody>${rows
+      .map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`)
+      .join("")}</tbody></table>`
+    : (emptyMessage ? `<p class="empty-pset">${escapeHtml(emptyMessage)}</p>` : "");
+
+  return `<section class="pset-section">
+    <div class="pset-title">${escapeHtml(title)}</div>
+    ${body}
+  </section>`;
 }
 
 function stringifyForDebug(value) {
@@ -93,21 +96,53 @@ function stringifyForDebug(value) {
   ), 2);
 }
 
-function extractMensuraProps(propertySets) {
+function findPropertySet(propertySets, targetName) {
   const sets = Array.isArray(propertySets) ? propertySets : (propertySets ? [propertySets] : []);
   for (const pset of sets) {
     const name = pset.name ?? pset.setName ?? "";
-    if (name !== PSET_NAME) continue;
-    if (Array.isArray(pset.properties)) {
-      const result = {};
-      for (const p of pset.properties) { result[p.name] = p.value; }
-      return result;
-    }
-    if (pset.properties && typeof pset.properties === "object") {
-      return { ...pset.properties };
-    }
+    if (name === targetName) return pset;
   }
   return null;
+}
+
+function getPropertyEntries(pset) {
+  if (!pset) return [];
+
+  if (Array.isArray(pset.properties)) {
+    return pset.properties
+      .filter((property) => property && property.name != null)
+      .map((property) => [property.name, property.value]);
+  }
+
+  if (pset.properties && typeof pset.properties === "object") {
+    return Object.entries(pset.properties);
+  }
+
+  return [];
+}
+
+function buildPropertiesView(propertySets) {
+  const generalRows = [];
+
+  const primaryEntries = getPropertyEntries(findPropertySet(propertySets, PSET_NAME));
+  if (primaryEntries[0]) {
+    generalRows.push(primaryEntries[0]);
+  }
+
+  const secondaryEntries = getPropertyEntries(findPropertySet(propertySets, SECONDARY_PSET_NAME));
+  const secondaryMatch = secondaryEntries.find(([name]) => name === SECONDARY_PROPERTY_NAME);
+  if (secondaryMatch) {
+    generalRows.push(["NOM", secondaryMatch[1]]);
+  }
+
+  if (generalRows.length === 0) {
+    return "";
+  }
+
+  return [
+    buildSection(GENERAL_INFO_TITLE, generalRows),
+    buildSection(MATERIALS_TITLE, [])
+  ].join("");
 }
 
 function getSelectionTarget(selection) {
@@ -174,14 +209,14 @@ async function loadProperties(api, selectionTarget) {
       return;
     }
 
-    const mensuraProps = extractMensuraProps(sets);
+    const propertiesView = buildPropertiesView(sets);
 
-    if (mensuraProps) {
+    if (propertiesView) {
       setStatus("Objet sélectionné.", "ok");
-      contentEl.innerHTML = buildTable(mensuraProps);
+      contentEl.innerHTML = propertiesView;
     } else {
       const psetNames = sets.map(s => s.name ?? s.setName ?? "(sans nom)");
-      setStatus(`PSET "${PSET_NAME}" introuvable.`, "error");
+      setStatus(`PSET "${PSET_NAME}" ou "${SECONDARY_PSET_NAME}" introuvable.`, "error");
       contentEl.innerHTML = `
         <p class="empty-pset">PSET disponibles :</p>
         <ul style="font-size:11px;padding-left:16px;margin-top:4px;">
