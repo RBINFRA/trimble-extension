@@ -43,9 +43,10 @@ function getBranchFromUrl() {
 }
 
 async function getDefaultBranch() {
-  const response = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`);
+  const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
+  const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`GitHub API ${response.status}`);
+    throw new Error(`Échec de lecture de ${url} (statut ${response.status}).`);
   }
 
   const repo = await response.json();
