@@ -78,10 +78,11 @@ function buildTable(props) {
   if (entries.length === 0) {
     return `<p class="empty-pset">Aucune propriété dans « ${escapeHtml(PSET_NAME)} ».</p>`;
   }
+  const [, firstValue] = entries[0];
   const rows = entries
     .map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`)
     .join("");
-  return `<div class="pset-title">${escapeHtml(PSET_NAME)}</div>
+  return `<div class="pset-title">${escapeHtml(firstValue)}</div>
     <table><tbody>${rows}</tbody></table>`;
 }
 
