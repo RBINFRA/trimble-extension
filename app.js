@@ -35,8 +35,8 @@ function buildTable(props) {
 }
 
 function stringifyForDebug(value) {
-  return JSON.stringify(value, (_, currentValue) => (
-    typeof currentValue === "bigint" ? currentValue.toString() : currentValue
+  return JSON.stringify(value, (_, current) => (
+    typeof current === "bigint" ? current.toString() : current
   ), 2);
 }
 
