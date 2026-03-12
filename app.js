@@ -51,28 +51,69 @@ function extractMensuraProps(propertySets) {
   return null;
 }
 
-async function loadProperties(api, runtimeId) {
+function getSelectionTarget(selection) {
+  if (Array.isArray(selection) && selection.length > 0) {
+    const firstEntry = selection[0];
+    if (typeof firstEntry === "number" || typeof firstEntry === "string") {
+      return {
+        modelId: null,
+        runtimeId: Number(firstEntry)
+      };
+    }
+  }
+
+  const groups = Array.isArray(selection) ? selection : (selection ? [selection] : []);
+  for (const group of groups) {
+    const runtimeIds = Array.isArray(group?.objectRuntimeIds)
+      ? group.objectRuntimeIds
+      : (Array.isArray(group?.runtimeIds)
+        ? group.runtimeIds
+        : (Array.isArray(group?.objectIds)
+          ? group.objectIds
+          : (Array.isArray(group?.ids) ? group.ids : [])));
+
+    if (runtimeIds.length === 0) continue;
+
+    const runtimeId = Number(runtimeIds[0]);
+    if (!Number.isFinite(runtimeId)) continue;
+
+    return {
+      modelId: group?.modelId ?? null,
+      runtimeId
+    };
+  }
+
+  return null;
+}
+
+function getPropertySets(result) {
+  const objects = Array.isArray(result) ? result : (result ? [result] : []);
+  const selectedObject = objects[0];
+
+  if (Array.isArray(selectedObject?.properties)) {
+    return selectedObject.properties;
+  }
+
+  return Array.isArray(result) ? result : (result?.properties ?? []);
+}
+
+async function loadProperties(api, selectionTarget) {
   setStatus("Chargement…");
 
   try {
-    // Récupère modelId et id numérique via getObjects
-    const objects = await api.viewer.getObjects({ runtimeIds: [runtimeId] });
-
-    if (!objects || objects.length === 0) {
-      setStatus("Objet introuvable.", "error");
+    const { modelId, runtimeId } = selectionTarget;
+    if (!modelId || !Number.isFinite(runtimeId)) {
+      setStatus("Sélection invalide.", "error");
+      contentEl.innerHTML = `<p class="empty-pset">Impossible d’identifier l’objet sélectionné.</p>`;
       return;
     }
 
-    const modelId  = objects[0].modelId;
-    const objId    = objects[0].objects?.[0]?.id ?? objects[0].id;
+    console.log("[Mensura] modelId:", modelId, "runtimeId:", runtimeId);
 
-    console.log("[Mensura] modelId:", modelId, "objId:", objId);
-
-    // Appel avec modelId + id numérique
-    const result = await api.viewer.getObjectProperties(objId, modelId);
+    const result = await api.viewer.getObjectProperties(modelId, [runtimeId]);
     console.log("[Mensura] getObjectProperties résultat:", JSON.stringify(result, null, 2));
 
-    const sets = Array.isArray(result) ? result : (result ? [result] : []);
+    const sets = getPropertySets(result);
 
     if (sets.length === 0) {
       setStatus("Aucun PSET retourné.", "error");
@@ -124,10 +165,8 @@ async function main() {
   setInterval(async () => {
     try {
       const selection = await api.viewer.getSelection();
-      const ids = Array.isArray(selection)
-        ? selection
-        : (selection?.ids ?? selection?.objectIds ?? []);
-      const currentId = ids.length > 0 ? String(ids[0]) : null;
+      const target = getSelectionTarget(selection);
+      const currentId = target ? `${target.modelId ?? "unknown"}:${target.runtimeId}` : null;
       if (currentId === lastId) return;
       lastId = currentId;
       if (!currentId) {
@@ -135,7 +174,7 @@ async function main() {
         contentEl.innerHTML = `<p style="color:#999;font-style:italic;text-align:center;margin-top:30px;">Sélectionnez un objet dans la maquette.</p>`;
         return;
       }
-      await loadProperties(api, currentId);
+      await loadProperties(api, target);
     } catch (_) {}
   }, POLL_INTERVAL_MS);
 }
