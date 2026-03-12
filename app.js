@@ -52,33 +52,22 @@ function extractMensuraProps(propertySets) {
 }
 
 function getSelectionTarget(selection) {
-  if (Array.isArray(selection) && selection.length > 0) {
-    const firstEntry = selection[0];
-    if (typeof firstEntry === "number" || typeof firstEntry === "string") {
-      return {
-        modelId: null,
-        runtimeId: Number(firstEntry)
-      };
-    }
-  }
-
   const groups = Array.isArray(selection) ? selection : (selection ? [selection] : []);
   for (const group of groups) {
-    const runtimeIds = Array.isArray(group?.objectRuntimeIds)
-      ? group.objectRuntimeIds
-      : (Array.isArray(group?.runtimeIds)
-        ? group.runtimeIds
-        : (Array.isArray(group?.objectIds)
-          ? group.objectIds
-          : (Array.isArray(group?.ids) ? group.ids : [])));
+    const runtimeIds = [
+      group?.objectRuntimeIds,
+      group?.runtimeIds,
+      group?.objectIds,
+      group?.ids
+    ].find(Array.isArray) ?? [];
 
     if (runtimeIds.length === 0) continue;
 
     const runtimeId = Number(runtimeIds[0]);
-    if (!Number.isFinite(runtimeId)) continue;
+    if (!group?.modelId || !Number.isFinite(runtimeId)) continue;
 
     return {
-      modelId: group?.modelId ?? null,
+      modelId: group.modelId,
       runtimeId
     };
   }
@@ -87,14 +76,19 @@ function getSelectionTarget(selection) {
 }
 
 function getPropertySets(result) {
-  const objects = Array.isArray(result) ? result : (result ? [result] : []);
-  const selectedObject = objects[0];
-
-  if (Array.isArray(selectedObject?.properties)) {
-    return selectedObject.properties;
+  if (Array.isArray(result?.properties)) {
+    return result.properties;
   }
 
-  return Array.isArray(result) ? result : (result?.properties ?? []);
+  if (!Array.isArray(result) || result.length === 0) {
+    return [];
+  }
+
+  if (result[0]?.name && Array.isArray(result[0]?.properties)) {
+    return result;
+  }
+
+  return Array.isArray(result[0]?.properties) ? result[0].properties : [];
 }
 
 async function loadProperties(api, selectionTarget) {
@@ -166,7 +160,7 @@ async function main() {
     try {
       const selection = await api.viewer.getSelection();
       const target = getSelectionTarget(selection);
-      const currentId = target ? `${target.modelId ?? "unknown"}:${target.runtimeId}` : null;
+      const currentId = target ? `${target.modelId}:${target.runtimeId}` : null;
       if (currentId === lastId) return;
       lastId = currentId;
       if (!currentId) {
