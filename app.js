@@ -206,7 +206,7 @@ function buildPropertiesView(propertySets, product) {
   return [
     buildSection(GENERAL_INFO_TITLE, [
       buildRow("ZONE", getPropertyValue(primaryPset, ["ZONE"])),
-      buildRow("NOM", getPropertyValue(secondaryPset, ["Nom couche"]) ?? product?.name)
+      buildRow("NOM", getPropertyValue(secondaryPset, ["Code de PTF"]))
     ]),
     buildSection(MATERIALS_TITLE, [
       buildRow("COUCHE 1", getPropertyValue(primaryPset, ["COUCHE 1", "COUCHE1"])),
