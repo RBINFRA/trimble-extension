@@ -5,9 +5,11 @@
 
 const PSET_NAME = "PSET - Attributs Mensura";
 const SECONDARY_PSET_NAME = "PSET-MENSURA";
-const SECONDARY_PROPERTY_NAME = "Code de PTF";
-const GENERAL_INFO_TITLE = "Information générale";
+const GENERAL_INFO_TITLE = "Informations générales";
 const MATERIALS_TITLE = "Matériaux";
+const SOURCES_TITLE = "Sources";
+const GEOMETRY_TITLE = "Géométrie";
+const MISSING_DATA_LABEL = "Pas de données";
 const POLL_INTERVAL_MS = 800;
 const REPO_OWNER = "RBINFRA";
 const REPO_NAME = "trimble-extension";
@@ -77,16 +79,16 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
-function buildSection(title, rows, emptyMessage = "") {
-  const body = rows.length > 0
-    ? `<table><tbody>${rows
-      .map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`)
-      .join("")}</tbody></table>`
-    : (emptyMessage ? `<p class="empty-pset">${escapeHtml(emptyMessage)}</p>` : "");
-
+function buildSection(title, rows) {
   return `<section class="pset-section">
-    <div class="pset-title">${escapeHtml(title)}</div>
-    ${body}
+    <table>
+      <thead>
+        <tr><th colspan="2" class="section-heading">${escapeHtml(title)}</th></tr>
+      </thead>
+      <tbody>${rows
+        .map(({ label, value, missing }) => `<tr><td>${escapeHtml(label)}</td><td class="${missing ? "value-missing" : "value-present"}">${escapeHtml(value)}</td></tr>`)
+        .join("")}</tbody>
+    </table>
   </section>`;
 }
 
@@ -121,28 +123,75 @@ function getPropertyEntries(pset) {
   return [];
 }
 
-function buildPropertiesView(propertySets) {
-  const generalRows = [];
+function normalizePropertyName(name) {
+  return String(name ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9]/g, "")
+    .toUpperCase();
+}
 
-  const primaryEntries = getPropertyEntries(findPropertySet(propertySets, PSET_NAME));
-  if (primaryEntries[0]) {
-    const [primaryLabel, primaryValue] = primaryEntries[0];
-    generalRows.push([primaryLabel === "NOM" ? "LOCALISATION" : primaryLabel, primaryValue]);
+function getPropertyValue(pset, candidates) {
+  const entries = getPropertyEntries(pset);
+  if (!entries.length) return undefined;
+
+  const normalizedCandidates = candidates.map(normalizePropertyName);
+  for (const [name, value] of entries) {
+    if (normalizedCandidates.includes(normalizePropertyName(name))) {
+      return value;
+    }
   }
 
-  const secondaryEntries = getPropertyEntries(findPropertySet(propertySets, SECONDARY_PSET_NAME));
-  const secondaryMatch = secondaryEntries.find(([name]) => name === SECONDARY_PROPERTY_NAME);
-  if (secondaryMatch) {
-    generalRows.push(["NOM", secondaryMatch[1]]);
+  return undefined;
+}
+
+function formatDisplayValue(value) {
+  if (value == null) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  return typeof value === "object" ? stringifyForDebug(value) : String(value);
+}
+
+function buildRow(label, value) {
+  const displayValue = formatDisplayValue(value);
+  return {
+    label,
+    value: displayValue ?? MISSING_DATA_LABEL,
+    missing: displayValue == null
+  };
+}
+
+function getPrimaryObject(result) {
+  if (Array.isArray(result)) {
+    return result[0] ?? null;
   }
 
-  if (generalRows.length === 0) {
-    return "";
-  }
+  return result ?? null;
+}
+
+function buildPropertiesView(propertySets, product) {
+  const primaryPset = findPropertySet(propertySets, PSET_NAME);
+  const secondaryPset = findPropertySet(propertySets, SECONDARY_PSET_NAME);
 
   return [
-    buildSection(GENERAL_INFO_TITLE, generalRows),
-    buildSection(MATERIALS_TITLE, [])
+    buildSection(GENERAL_INFO_TITLE, [
+      buildRow("ZONE", getPropertyValue(primaryPset, ["ZONE"])),
+      buildRow("NOM", getPropertyValue(secondaryPset, ["Nom couche"]) ?? product?.name)
+    ]),
+    buildSection(MATERIALS_TITLE, [
+      buildRow("COUCHE 1", getPropertyValue(primaryPset, ["COUCHE 1", "COUCHE1"])),
+      buildRow("COUCHE 2", getPropertyValue(primaryPset, ["COUCHE 2", "COUCHE2"])),
+      buildRow("COUCHE 3", getPropertyValue(primaryPset, ["COUCHE 3", "COUCHE3"])),
+      buildRow("COUCHE 4", getPropertyValue(primaryPset, ["COUCHE 4", "COUCHE4"])),
+      buildRow("COUCHE 5", getPropertyValue(primaryPset, ["COUCHE 5", "COUCHE5"]))
+    ]),
+    buildSection(SOURCES_TITLE, [
+      buildRow("SOURCE", getPropertyValue(primaryPset, ["SOURCE"])),
+      buildRow("ENTRPRISE D'EXECUTION", getPropertyValue(primaryPset, ["ENTRPRISE D'EXECUTION", "ENTREPRISE D'EXECUTION"])),
+      buildRow("DATE", getPropertyValue(primaryPset, ["DATE"]))
+    ]),
+    buildSection(GEOMETRY_TITLE, [
+      buildRow("SURFACE", getPropertyValue(secondaryPset, ["Surface Horizontale"]))
+    ])
   ].join("");
 }
 
@@ -202,28 +251,12 @@ async function loadProperties(api, selectionTarget) {
     const result = await api.viewer.getObjectProperties(modelId, [runtimeId]);
     console.log("[Mensura] getObjectProperties résultat:", stringifyForDebug(result));
 
+    const objectResult = getPrimaryObject(result);
     const sets = getPropertySets(result);
+    const propertiesView = buildPropertiesView(sets, objectResult?.product);
 
-    if (sets.length === 0) {
-      setStatus("Aucun PSET retourné.", "error");
-      contentEl.innerHTML = `<p class="empty-pset">Aucune propriété trouvée pour cet objet.</p>`;
-      return;
-    }
-
-    const propertiesView = buildPropertiesView(sets);
-
-    if (propertiesView) {
-      setStatus("Objet sélectionné.", "ok");
-      contentEl.innerHTML = propertiesView;
-    } else {
-      const psetNames = sets.map(s => s.name ?? s.setName ?? "(sans nom)");
-      setStatus(`PSET "${PSET_NAME}" ou "${SECONDARY_PSET_NAME}" introuvable.`, "error");
-      contentEl.innerHTML = `
-        <p class="empty-pset">PSET disponibles :</p>
-        <ul style="font-size:11px;padding-left:16px;margin-top:4px;">
-          ${psetNames.map(n => `<li><code>${escapeHtml(n)}</code></li>`).join("")}
-        </ul>`;
-    }
+    setStatus("Objet sélectionné.", "ok");
+    contentEl.innerHTML = propertiesView;
 
   } catch (err) {
     console.error("[Mensura] Erreur:", err);
