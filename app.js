@@ -126,7 +126,8 @@ function buildPropertiesView(propertySets) {
 
   const primaryEntries = getPropertyEntries(findPropertySet(propertySets, PSET_NAME));
   if (primaryEntries[0]) {
-    generalRows.push(primaryEntries[0]);
+    const [primaryLabel, primaryValue] = primaryEntries[0];
+    generalRows.push([primaryLabel === "NOM" ? "LOCALISATION" : primaryLabel, primaryValue]);
   }
 
   const secondaryEntries = getPropertyEntries(findPropertySet(propertySets, SECONDARY_PSET_NAME));
