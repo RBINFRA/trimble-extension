@@ -77,10 +77,14 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
+function getDisplayLabel(label) {
+  return label === "NOM" ? "LOCALISATION" : label;
+}
+
 function buildSection(title, rows, emptyMessage = "") {
   const body = rows.length > 0
     ? `<table><tbody>${rows
-      .map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`)
+      .map(([k, v]) => `<tr><td>${escapeHtml(getDisplayLabel(k))}</td><td>${escapeHtml(v)}</td></tr>`)
       .join("")}</tbody></table>`
     : (emptyMessage ? `<p class="empty-pset">${escapeHtml(emptyMessage)}</p>` : "");
 
@@ -132,7 +136,7 @@ function buildPropertiesView(propertySets) {
   const secondaryEntries = getPropertyEntries(findPropertySet(propertySets, SECONDARY_PSET_NAME));
   const secondaryMatch = secondaryEntries.find(([name]) => name === SECONDARY_PROPERTY_NAME);
   if (secondaryMatch) {
-    generalRows.push(["NOM", secondaryMatch[1]]);
+    generalRows.push(["LOCALISATION", secondaryMatch[1]]);
   }
 
   if (generalRows.length === 0) {
