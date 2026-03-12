@@ -77,14 +77,10 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
-function getDisplayLabel(label) {
-  return label === "NOM" ? "LOCALISATION" : label;
-}
-
 function buildSection(title, rows, emptyMessage = "") {
   const body = rows.length > 0
     ? `<table><tbody>${rows
-      .map(([k, v]) => `<tr><td>${escapeHtml(getDisplayLabel(k))}</td><td>${escapeHtml(v)}</td></tr>`)
+      .map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`)
       .join("")}</tbody></table>`
     : (emptyMessage ? `<p class="empty-pset">${escapeHtml(emptyMessage)}</p>` : "");
 
@@ -130,13 +126,14 @@ function buildPropertiesView(propertySets) {
 
   const primaryEntries = getPropertyEntries(findPropertySet(propertySets, PSET_NAME));
   if (primaryEntries[0]) {
-    generalRows.push(primaryEntries[0]);
+    const [primaryLabel, primaryValue] = primaryEntries[0];
+    generalRows.push([primaryLabel === "NOM" ? "LOCALISATION" : primaryLabel, primaryValue]);
   }
 
   const secondaryEntries = getPropertyEntries(findPropertySet(propertySets, SECONDARY_PSET_NAME));
   const secondaryMatch = secondaryEntries.find(([name]) => name === SECONDARY_PROPERTY_NAME);
   if (secondaryMatch) {
-    generalRows.push([getDisplayLabel("NOM"), secondaryMatch[1]]);
+    generalRows.push(["NOM", secondaryMatch[1]]);
   }
 
   if (generalRows.length === 0) {
