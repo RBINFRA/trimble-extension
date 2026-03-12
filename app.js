@@ -34,6 +34,12 @@ function buildTable(props) {
     <table><tbody>${rows}</tbody></table>`;
 }
 
+function stringifyForDebug(value) {
+  return JSON.stringify(value, (_, current) => (
+    typeof current === "bigint" ? current.toString() : current
+  ), 2);
+}
+
 function extractMensuraProps(propertySets) {
   const sets = Array.isArray(propertySets) ? propertySets : (propertySets ? [propertySets] : []);
   for (const pset of sets) {
@@ -105,7 +111,7 @@ async function loadProperties(api, selectionTarget) {
     console.log("[Mensura] modelId:", modelId, "runtimeId:", runtimeId);
 
     const result = await api.viewer.getObjectProperties(modelId, [runtimeId]);
-    console.log("[Mensura] getObjectProperties résultat:", JSON.stringify(result, null, 2));
+    console.log("[Mensura] getObjectProperties résultat:", stringifyForDebug(result));
 
     const sets = getPropertySets(result);
 
