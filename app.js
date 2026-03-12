@@ -151,6 +151,37 @@ function formatDisplayValue(value) {
   return typeof value === "object" ? stringifyForDebug(value) : String(value);
 }
 
+function formatSurfaceValue(value) {
+  if (value == null) return null;
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return `${value.toLocaleString("fr-FR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })} m²`;
+  }
+
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+    if (trimmedValue === "") return null;
+
+    const normalizedValue = trimmedValue
+      .replace(/\s*m(?:²|2)\s*$/i, "")
+      .replace(/\s+/g, "")
+      .replace(",", ".");
+    const numericValue = Number(normalizedValue);
+
+    if (Number.isFinite(numericValue)) {
+      return `${numericValue.toLocaleString("fr-FR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })} m²`;
+    }
+  }
+
+  return formatDisplayValue(value);
+}
+
 function buildRow(label, value) {
   const displayValue = formatDisplayValue(value);
   return {
@@ -190,7 +221,7 @@ function buildPropertiesView(propertySets, product) {
       buildRow("DATE", getPropertyValue(primaryPset, ["DATE"]))
     ]),
     buildSection(GEOMETRY_TITLE, [
-      buildRow("SURFACE", getPropertyValue(secondaryPset, ["Surface Horizontale"]))
+      buildRow("SURFACE", formatSurfaceValue(getPropertyValue(secondaryPset, ["Surface Horizontale"])))
     ])
   ].join("");
 }
