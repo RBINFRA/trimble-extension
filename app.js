@@ -3,7 +3,7 @@
  * Utilise modelId + id numérique pour getObjectProperties
  */
 
-const PSET_NAME = "PSET-MENSURA";
+const PSET_NAME = "PSET - Attributs Mensura";
 const POLL_INTERVAL_MS = 800;
 
 const statusEl  = document.getElementById("status");
