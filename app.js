@@ -109,7 +109,9 @@ function getPropertyEntries(pset) {
   if (!pset) return [];
 
   if (Array.isArray(pset.properties)) {
-    return pset.properties.map((property) => [property?.name, property?.value]);
+    return pset.properties
+      .filter((property) => property && property.name != null)
+      .map((property) => [property.name, property.value]);
   }
 
   if (pset.properties && typeof pset.properties === "object") {
