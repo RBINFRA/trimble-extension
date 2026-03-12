@@ -136,7 +136,7 @@ function buildPropertiesView(propertySets) {
   const secondaryEntries = getPropertyEntries(findPropertySet(propertySets, SECONDARY_PSET_NAME));
   const secondaryMatch = secondaryEntries.find(([name]) => name === SECONDARY_PROPERTY_NAME);
   if (secondaryMatch) {
-    generalRows.push(["LOCALISATION", secondaryMatch[1]]);
+    generalRows.push([getDisplayLabel("NOM"), secondaryMatch[1]]);
   }
 
   if (generalRows.length === 0) {
