@@ -16,8 +16,20 @@
       background: #0072c6;
       color: white;
       padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
       font-weight: 600;
       font-size: 14px;
+    }
+    #branch {
+      font-size: 11px;
+      font-weight: 500;
+      background: rgba(255,255,255,0.18);
+      padding: 3px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
     }
     #status {
       padding: 10px 14px;
@@ -66,7 +78,10 @@
   </style>
 </head>
 <body>
-  <div id="header">Propriétés</div>
+  <div id="header">
+    <span>Propriétés</span>
+    <span id="branch">Branche active : chargement…</span>
+  </div>
   <div id="status">Connexion à Trimble Connect…</div>
   <div id="content">
     <p class="no-selection">Sélectionnez un objet dans la maquette.</p>

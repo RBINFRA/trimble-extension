@@ -5,13 +5,64 @@
 
 const PSET_NAME = "PSET - Attributs Mensura";
 const POLL_INTERVAL_MS = 800;
+const REPO_OWNER = "RBINFRA";
+const REPO_NAME = "trimble-extension";
 
 const statusEl  = document.getElementById("status");
 const contentEl = document.getElementById("content");
+const branchEl = document.getElementById("branch");
 
 function setStatus(msg, type = "") {
   statusEl.textContent = msg;
   statusEl.className   = type;
+}
+
+function setBranch(branchName) {
+  const label = branchName?.trim() || "inconnue";
+  branchEl.textContent = `Branche active : ${label}`;
+}
+
+function getBranchFromQuery() {
+  const branchName = new URLSearchParams(window.location.search).get("branch");
+  return branchName?.trim() || null;
+}
+
+function getBranchFromUrl() {
+  const { hostname, pathname } = window.location;
+  const segments = pathname.split("/").filter(Boolean);
+
+  if (hostname === "raw.githubusercontent.com" && segments.length >= 3) {
+    return segments[2];
+  }
+
+  if (hostname === "raw.githack.com" && segments.length >= 3) {
+    return segments[2];
+  }
+
+  return null;
+}
+
+async function getDefaultBranch() {
+  const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Échec de lecture de ${url} (statut ${response.status}).`);
+  }
+
+  const repo = await response.json();
+  return repo.default_branch?.trim() || null;
+}
+
+async function initBranch() {
+  try {
+    const branchName = getBranchFromQuery()
+      || getBranchFromUrl()
+      || await getDefaultBranch();
+    setBranch(branchName);
+  } catch (err) {
+    console.warn("[Mensura] Impossible de déterminer la branche active:", err);
+    setBranch(null);
+  }
 }
 
 function escapeHtml(str) {
@@ -27,10 +78,12 @@ function buildTable(props) {
   if (entries.length === 0) {
     return `<p class="empty-pset">Aucune propriété dans « ${escapeHtml(PSET_NAME)} ».</p>`;
   }
+  const [, firstValue] = entries[0];
+  const title = String(firstValue ?? "").trim() || PSET_NAME;
   const rows = entries
     .map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`)
     .join("");
-  return `<div class="pset-title">${escapeHtml(PSET_NAME)}</div>
+  return `<div class="pset-title">${escapeHtml(title)}</div>
     <table><tbody>${rows}</tbody></table>`;
 }
 
@@ -144,6 +197,7 @@ async function loadProperties(api, selectionTarget) {
 }
 
 async function main() {
+  await initBranch();
   setStatus("Connexion à Trimble Connect…");
 
   if (typeof TrimbleConnectWorkspace === "undefined") {
